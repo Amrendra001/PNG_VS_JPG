@@ -178,7 +178,7 @@ def get_page_no(df):
 
 
 def create_df(local_dir):
-    image_ls = os.listdir(f'{local_dir}/images/train/')
+    image_ls = os.listdir(f'{local_dir}images/train/')
     image_ls = [x[:-4] for x in image_ls]
     df = pd.DataFrame(image_ls, columns=['filename'])
     df['doc_id'] = df['filename'].apply(filename_to_doc_id)
