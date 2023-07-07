@@ -217,11 +217,9 @@ def main_working(df, old_dir, new_dir):
                     continue
 
             image_paths_local_png = convert_from_path(pdf_path, fmt='png', output_folder=TEMP_IMAGE_DIR, thread_count=2,
-                                                      output_file='', paths_only=True,
-                                                      poppler_path='C:/poppler-0.68.0/bin')
+                                                      output_file='', paths_only=True)
             image_paths_local_jpg = convert_from_path(pdf_path, fmt='jpg', output_folder=TEMP_IMAGE_DIR, thread_count=2,
-                                                      output_file='', paths_only=True,
-                                                      poppler_path='C:/poppler-0.68.0/bin')
+                                                      output_file='', paths_only=True)
             for filename, page_no in zip(df_new['filename'], df_new['page_no']):
                 if doc_id in PHARMA_PO_1INDEX:
                     page_no -= 1
