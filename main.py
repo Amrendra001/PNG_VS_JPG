@@ -247,7 +247,7 @@ def create_new_data_from_df(df, old_dir, new_dir, version):
 
 s3_source_dir = f's3://document-ai-training-data/training_data/table_localisation/column/base_data/'
 destination_dir = f'yolov8_column/'
-# s3_sync(s3_source_dir, destination_dir)
+s3_sync(s3_source_dir, destination_dir)
 
 create_df(destination_dir)
 
