@@ -309,7 +309,7 @@ def main_working(df, old_dir, new_dir):
 
         # try:
 
-        if os.path.isfile(f'{os.getcwd()}/{new_dir}/images/train/{df_new["filename"][0]}_{method_type[0]}.{extension}'):
+        if os.path.isfile(f'{os.getcwd()}/{new_dir}/images/train/{df_new["filename"].iloc[0]}_{method_type[0]}.{extension}'):
             continue
 
         pdf_path, is_found = get_pdf_path(doc_id)
