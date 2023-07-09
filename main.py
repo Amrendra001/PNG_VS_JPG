@@ -332,10 +332,10 @@ def create_new_data_from_df(df, old_dir, new_dir):
     if not os.path.isdir(new_dir):
         os.makedirs(new_dir)
 
-    # df_1, df_2, df_3, df_4 = np.array_split(df, 4)
-    # multiprocessing_handler(main_working, [(df_1, old_dir, new_dir), (df_2, old_dir, new_dir), (df_3, old_dir, new_dir),
-    #                                        (df_4, old_dir, new_dir)])
-    main_working(df, old_dir, new_dir)
+    df_1, df_2, df_3, df_4 = np.array_split(df, 4)
+    multiprocessing_handler(main_working, [(df_1, old_dir, new_dir), (df_2, old_dir, new_dir), (df_3, old_dir, new_dir),
+                                           (df_4, old_dir, new_dir)])
+    # main_working(df, old_dir, new_dir)
 
 
 s3_source_dir = f's3://document-ai-training-data/training_data/table_localisation/column/base_data/'
