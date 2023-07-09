@@ -307,29 +307,29 @@ def main_working(df, old_dir, new_dir):
         method_type = ['pdf2image', 'pyvips', 'pypdfium', 'pymupdf']
         extension = df_new['png_or_jpg'].unique()[0]
 
-        try:
+        # try:
 
-            if os.path.isfile(f'{os.getcwd()}/{new_dir}/images/train/{df_new["filename"][0]}_{method_type[0]}.{extension}'):
-                continue
+        if os.path.isfile(f'{os.getcwd()}/{new_dir}/images/train/{df_new["filename"][0]}_{method_type[0]}.{extension}'):
+            continue
 
-            pdf_path, is_found = get_pdf_path(doc_id)
-            if not is_found:
-                print(f'PDF not found for = {doc_id}')
-                copy_original(df_new, old_dir, new_dir)
-                continue
-
-            for method in method_type:
-                image_paths_local = get_image_paths_local(method, pdf_path, extension, doc_id)
-
-                for filename, page_no in zip(df_new['filename'], df_new['page_no']):
-                    shutil.move(f'{os.getcwd()}/{image_paths_local[page_no]}',
-                              f'{os.getcwd()}/{new_dir}/images/train/{filename}_{method}.{extension}')
-                    shutil.copyfile(f'{old_dir}/labels/train/{filename}.txt',
-                                    f'{new_dir}/labels/train/{filename}_{method}.txt')
-
-        except:
-            print(f'Error in = {doc_id}')
+        pdf_path, is_found = get_pdf_path(doc_id)
+        if not is_found:
+            print(f'PDF not found for = {doc_id}')
             copy_original(df_new, old_dir, new_dir)
+            continue
+
+        for method in method_type:
+            image_paths_local = get_image_paths_local(method, pdf_path, extension, doc_id)
+
+            for filename, page_no in zip(df_new['filename'], df_new['page_no']):
+                shutil.move(f'{os.getcwd()}/{image_paths_local[page_no]}',
+                          f'{os.getcwd()}/{new_dir}/images/train/{filename}_{method}.{extension}')
+                shutil.copyfile(f'{old_dir}/labels/train/{filename}.txt',
+                                f'{new_dir}/labels/train/{filename}_{method}.txt')
+
+        # except:
+        #     print(f'Error in = {doc_id}')
+        #     copy_original(df_new, old_dir, new_dir)
 
 
 def create_new_data_from_df(df, old_dir, new_dir):
