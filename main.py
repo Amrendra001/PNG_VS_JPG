@@ -1,13 +1,21 @@
 import os
+
+vipshome = 'C:/vips-dev-8.14/bin/'
+os.environ['PATH'] = vipshome + ';' + os.environ['PATH']
+
 import pandas as pd
 import numpy as np
 import boto3
-from pdf2image import convert_from_path
 from tqdm import tqdm
 from botocore.errorfactory import ClientError
 import time
 from multiprocessing import Process, Pipe, cpu_count
 import shutil
+import random
+import pyvips
+import fitz
+from pdf2image import convert_from_path
+import pypdfium2 as pdfium
 
 TEMP_FOLDER = 'pdf_path/'
 TEMP_IMAGE_DIR = 'tmp_image_dir/'
@@ -56,6 +64,7 @@ PHARMA_PO_1INDEX = [
     'PHARMA_TEST_202252112531243387',
     'PHARMA_TEST_2022518102427375868',
 ]
+
 
 def child_process_wrapper(runner_func, child_conn, *args):
     output = runner_func(*args)
@@ -126,18 +135,27 @@ def download_from_s3(key, bucket_name, s3_region):
     return pdf_path, True
 
 
-def create_new_col_based_on_unique_values(df, column_name):
+def create_dict_png_jpg(df, column_name):
     cnt_1 = 0
     cnt_2 = 0
-    doc_id_to_pdf2_image_version = dict()
+    doc_id_to_png_or_jpg = dict()
     for doc_id, value in zip(df[column_name].value_counts().index, df[column_name].value_counts()):
         if cnt_1 <= cnt_2:
-            doc_id_to_pdf2_image_version[doc_id] = '1.16.0'
+            doc_id_to_png_or_jpg[doc_id] = 'png'
             cnt_1 += value
         else:
-            doc_id_to_pdf2_image_version[doc_id] = '1.16.3'
+            doc_id_to_png_or_jpg[doc_id] = 'jpg'
             cnt_2 += value
-    return doc_id_to_pdf2_image_version
+    return doc_id_to_png_or_jpg
+
+
+def create_dict_coversion_method(df, column_name):
+    methods = ['pdf2image', 'pyvips', 'pypdfium', 'pymupdf', 'mutool']
+    doc_id_to_methods = dict()
+    random.seed(47)
+    for doc_id, value in zip(df[column_name].value_counts().index, df[column_name].value_counts()):
+        doc_id_to_methods[doc_id] = ','.join(random.sample(methods, 3))
+    return doc_id_to_methods
 
 
 def filename_to_doc_id(x):
@@ -177,14 +195,25 @@ def get_page_no(df):
     return ls
 
 
+def get_png_jpg_conversion_ls(df):
+    doc_id_to_png_or_jpg = create_dict_png_jpg(df, 'doc_id')
+    return df['doc_id'].apply(lambda x: doc_id_to_png_or_jpg[x])
+
+
+def get_method_conversion_ls(df):
+    doc_id_to_methods = create_dict_coversion_method(df, 'doc_id')
+    return df['doc_id'].apply(lambda x: doc_id_to_methods[x])
+
+
 def create_df(local_dir):
     image_ls = os.listdir(f'{local_dir}images/train/')
     image_ls = [x[:-4] for x in image_ls]
     df = pd.DataFrame(image_ls, columns=['filename'])
     df['doc_id'] = df['filename'].apply(filename_to_doc_id)
     df['page_no'] = df['filename'].apply(filename_to_page_no)
-    doc_id_to_pdf2_image_version = create_new_col_based_on_unique_values(df, 'doc_id')
-    df['pdf2_image_version'] = df['doc_id'].apply(lambda x: doc_id_to_pdf2_image_version[x])
+    df.loc[df['doc_id'].isin(PHARMA_PO_1INDEX), 'page_no'] -= 1
+    df['png_or_jpg'] = get_png_jpg_conversion_ls(df)
+    df['conversion_methods'] = get_method_conversion_ls(df)
     df.to_csv('png_jpg_pdf2image_lib_data.csv', index=False)
 
 
@@ -203,46 +232,110 @@ def copy_original(df_new, old_dir, new_dir):
         shutil.copyfile(f'{old_dir}/labels/train/{filename}.json', f'{new_dir}/labels/train/{filename}.json')
 
 
+def get_pdf_path(doc_id):
+    pdf_path, is_found = download_and_get_pdf_path(doc_id, 'PDF')
+    if not is_found:
+        pdf_path, is_found = download_and_get_pdf_path(doc_id, 'pdf')
+    return pdf_path, is_found
+
+
+def use_method_pdf2image(pdf_path, extension):
+    return convert_from_path(pdf_path, fmt=extension, output_folder=TEMP_IMAGE_DIR, thread_count=4, paths_only=True,
+                             output_file='', poppler_path='C:/poppler-0.68.0/bin')
+
+
+def use_method_pyvips(pdf_path, extension):
+    image = pyvips.Image.new_from_file(pdf_path)
+    image_paths = []
+    for i in range(image.get('n-pages')):
+        image = pyvips.Image.new_from_file(pdf_path, page=i)
+        image.write_to_file(f"{TEMP_IMAGE_DIR}pyvips-{i}.{extension}")
+        image_paths.append(f"{TEMP_IMAGE_DIR}pyvips-{i}.{extension}")
+    return image_paths
+
+
+def use_method_pypdfium(pdf_path, extension):
+    pdf = pdfium.PdfDocument(pdf_path)
+    n_pages = len(pdf)
+    image_paths = []
+    for page_number in range(n_pages):
+        page = pdf.get_page(page_number)
+        pil_image = page.render(scale=3).to_pil()
+        pil_image.save(f"{TEMP_IMAGE_DIR}pypdfium-{page_number}.{extension}")
+        image_paths.append(f"{TEMP_IMAGE_DIR}pypdfium-{page_number}.{extension}")
+    return image_paths
+
+
+def use_method_pymupdf(pdf_path, extension):
+    image_paths = []
+    doc = fitz.open(pdf_path)  # open document
+    for i, page in enumerate(doc):  # iterate through the pages
+        pix = page.get_pixmap()  # render page to an image
+        pix.save(f"{TEMP_IMAGE_DIR}pymupdf-{i}.{extension}")
+        image_paths.append(f"{TEMP_IMAGE_DIR}pymupdf-{i}.{extension}")
+    return image_paths
+
+
+def use_method_mutool(pdf_path, extension):
+    os.system(
+        f"mutool draw -st -P -T 4 -B 2048 -r 200 -F png -o {TEMP_IMAGE_DIR}mutool-%d.{extension} {pdf_path} 1-100")
+    image_paths = []
+    for i in range(1, 100):
+        image_paths.append(f'{TEMP_IMAGE_DIR}mutool-{i}.{extension}')
+    return image_paths
+
+
+def get_image_paths_local(method, pdf_path, extension):
+    image_paths_local = []
+    if method == 'pdf2image':
+        image_paths_local = use_method_pdf2image(pdf_path, extension)
+    if method == 'pyvips':
+        image_paths_local = use_method_pyvips(pdf_path, extension)
+    if method == 'pypdfium':
+        image_paths_local = use_method_pypdfium(pdf_path, extension)
+    if method == 'pymupdf':
+        image_paths_local = use_method_pymupdf(pdf_path, extension)
+    if method == 'mutool':
+        image_paths_local = use_method_mutool(pdf_path, extension)
+    return image_paths_local
+
+
 def main_working(df, old_dir, new_dir):
     for doc_id in tqdm(df['doc_id'].unique()):
         df_new = df[df['doc_id'] == doc_id]
+        # method_type = df_new['conversion_methods'].unique()[0].split(',')
+        method_type = ['pdf2image', 'pyvips', 'pypdfium', 'pymupdf']
+        extension = df_new['png_or_jpg'].unique()[0]
 
         try:
-            pdf_path, is_found = download_and_get_pdf_path(doc_id, 'PDF')
+            pdf_path, is_found = get_pdf_path(doc_id)
             if not is_found:
-                pdf_path, is_found = download_and_get_pdf_path(doc_id, 'pdf')
-                if not is_found:
-                    print(f'PDF not found for = {doc_id}')
-                    copy_original(df_new, old_dir, new_dir)
-                    continue
+                print(f'PDF not found for = {doc_id}')
+                copy_original(df_new, old_dir, new_dir)
+                continue
 
-            image_paths_local_png = convert_from_path(pdf_path, fmt='png', output_folder=TEMP_IMAGE_DIR, thread_count=2,
-                                                      output_file='', paths_only=True)
-            image_paths_local_jpg = convert_from_path(pdf_path, fmt='jpg', output_folder=TEMP_IMAGE_DIR, thread_count=2,
-                                                      output_file='', paths_only=True)
-            for filename, page_no in zip(df_new['filename'], df_new['page_no']):
-                if doc_id in PHARMA_PO_1INDEX:
-                    page_no -= 1
-                os.rename(f'{os.getcwd()}/{image_paths_local_png[page_no]}', f'{os.getcwd()}/{new_dir}/images/train/{filename}_PNG.png')
-                os.rename(f'{os.getcwd()}/{image_paths_local_jpg[page_no]}', f'{os.getcwd()}/{new_dir}/images/train/{filename}_JPG.jpg')
-                shutil.copyfile(f'{old_dir}/labels/train/{filename}.json', f'{new_dir}/labels/train/{filename}_PNG.json')
-                shutil.copyfile(f'{old_dir}/labels/train/{filename}.json', f'{new_dir}/labels/train/{filename}_JPG.json')
+            for method in method_type:
+                image_paths_local = get_image_paths_local(method, pdf_path, extension)
+
+                for filename, page_no in zip(df_new['filename'], df_new['page_no']):
+                    shutil.move(f'{os.getcwd()}/{image_paths_local[page_no]}',
+                              f'{os.getcwd()}/{new_dir}/images/train/{filename}_{method}.{extension}')
+                    shutil.copyfile(f'{old_dir}/labels/train/{filename}.txt',
+                                    f'{new_dir}/labels/train/{filename}_{method}.txt')
 
         except:
             copy_original(df_new, old_dir, new_dir)
             print(f'Error in = {doc_id}')
 
 
-def create_new_data_from_df(df, old_dir, new_dir, version):
-    sync_command = f"pip install pdf2image=={version}"
-    os.system(sync_command)
-
+def create_new_data_from_df(df, old_dir, new_dir):
     if not os.path.isdir(new_dir):
         os.makedirs(new_dir)
 
-    df = df[df['pdf2_image_version'] == version]
-    df_1, df_2, df_3, df_4 = np.array_split(df, 4)
-    multiprocessing_handler(main_working, [(df_1, old_dir, new_dir), (df_2, old_dir, new_dir), (df_3, old_dir, new_dir), (df_4, old_dir, new_dir)])
+    # df_1, df_2, df_3, df_4 = np.array_split(df, 4)
+    # multiprocessing_handler(main_working, [(df_1, old_dir, new_dir), (df_2, old_dir, new_dir), (df_3, old_dir, new_dir),
+    #                                        (df_4, old_dir, new_dir)])
+    main_working(df, old_dir, new_dir)
 
 
 s3_source_dir = f's3://document-ai-training-data/training_data/table_localisation/column/base_data/'
@@ -253,7 +346,7 @@ create_df(destination_dir)
 
 old_dir = f'yolov8_column'
 new_dir = f'png_jpg_data'
+os.makedirs(f'{os.getcwd()}/{new_dir}/images/train/', exist_ok=True)
+os.makedirs(f'{os.getcwd()}/{new_dir}/labels/train/', exist_ok=True)
 df = pd.read_csv('png_jpg_pdf2image_lib_data.csv')
-create_new_data_from_df(df, old_dir, new_dir, '1.16.0')
-create_new_data_from_df(df, old_dir, new_dir, '1.16.3')
-
+create_new_data_from_df(df, old_dir, new_dir)
