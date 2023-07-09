@@ -1,7 +1,7 @@
 import os
 
-vipshome = 'C:/vips-dev-8.14/bin/'
-os.environ['PATH'] = vipshome + ';' + os.environ['PATH']
+# vipshome = 'C:/vips-dev-8.14/bin/'
+# os.environ['PATH'] = vipshome + ';' + os.environ['PATH']
 
 import pandas as pd
 import numpy as np
