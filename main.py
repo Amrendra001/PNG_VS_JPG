@@ -303,7 +303,8 @@ def get_image_paths_local(method, pdf_path, extension):
 def main_working(df, old_dir, new_dir):
     for doc_id in tqdm(df['doc_id'].unique()[40:]):
         df_new = df[df['doc_id'] == doc_id]
-        method_type = df_new['conversion_methods'].unique()[0].split(',')
+        # method_type = df_new['conversion_methods'].unique()[0].split(',')
+        method_type = ['pdf2image', 'pyvips', 'pypdfium', 'pymupdf']
         extension = df_new['png_or_jpg'].unique()[0]
 
         try:
