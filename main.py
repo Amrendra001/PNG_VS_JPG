@@ -241,7 +241,7 @@ def get_pdf_path(doc_id):
 
 def use_method_pdf2image(pdf_path, extension):
     return convert_from_path(pdf_path, fmt=extension, output_folder=TEMP_IMAGE_DIR, thread_count=4, paths_only=True,
-                             output_file='', poppler_path='C:/poppler-0.68.0/bin')
+                             output_file='')
 
 
 def use_method_pyvips(pdf_path, extension):
