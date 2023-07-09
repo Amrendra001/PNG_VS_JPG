@@ -229,7 +229,7 @@ def download_and_get_pdf_path(doc_id, extenstion):
 def copy_original(df_new, old_dir, new_dir):
     for filename in df_new['filename']:
         shutil.copyfile(f'{old_dir}/images/train/{filename}.png', f'{new_dir}/images/train/{filename}.png')
-        shutil.copyfile(f'{old_dir}/labels/train/{filename}.json', f'{new_dir}/labels/train/{filename}.json')
+        shutil.copyfile(f'{old_dir}/labels/train/{filename}.txt', f'{new_dir}/labels/train/{filename}.txt')
 
 
 def get_pdf_path(doc_id):
