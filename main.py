@@ -239,64 +239,64 @@ def get_pdf_path(doc_id):
     return pdf_path, is_found
 
 
-def use_method_pdf2image(pdf_path, extension):
+def use_method_pdf2image(pdf_path, extension, doc_id):
     return convert_from_path(pdf_path, fmt=extension, output_folder=TEMP_IMAGE_DIR, thread_count=4, paths_only=True,
-                             output_file='')
+                             output_file=doc_id)
 
 
-def use_method_pyvips(pdf_path, extension):
+def use_method_pyvips(pdf_path, extension, doc_id):
     image = pyvips.Image.new_from_file(pdf_path)
     image_paths = []
     for i in range(image.get('n-pages')):
         image = pyvips.Image.new_from_file(pdf_path, page=i)
-        image.write_to_file(f"{TEMP_IMAGE_DIR}pyvips-{i}.{extension}")
-        image_paths.append(f"{TEMP_IMAGE_DIR}pyvips-{i}.{extension}")
+        image.write_to_file(f"{TEMP_IMAGE_DIR}_{doc_id}_pyvips-{i}.{extension}")
+        image_paths.append(f"{TEMP_IMAGE_DIR}_{doc_id}_pyvips-{i}.{extension}")
     return image_paths
 
 
-def use_method_pypdfium(pdf_path, extension):
+def use_method_pypdfium(pdf_path, extension, doc_id):
     pdf = pdfium.PdfDocument(pdf_path)
     n_pages = len(pdf)
     image_paths = []
     for page_number in range(n_pages):
         page = pdf.get_page(page_number)
         pil_image = page.render(scale=3).to_pil()
-        pil_image.save(f"{TEMP_IMAGE_DIR}pypdfium-{page_number}.{extension}")
-        image_paths.append(f"{TEMP_IMAGE_DIR}pypdfium-{page_number}.{extension}")
+        pil_image.save(f"{TEMP_IMAGE_DIR}_{doc_id}_pypdfium-{page_number}.{extension}")
+        image_paths.append(f"{TEMP_IMAGE_DIR}_{doc_id}_pypdfium-{page_number}.{extension}")
     return image_paths
 
 
-def use_method_pymupdf(pdf_path, extension):
+def use_method_pymupdf(pdf_path, extension, doc_id):
     image_paths = []
     doc = fitz.open(pdf_path)  # open document
     for i, page in enumerate(doc):  # iterate through the pages
         pix = page.get_pixmap()  # render page to an image
-        pix.save(f"{TEMP_IMAGE_DIR}pymupdf-{i}.{extension}")
-        image_paths.append(f"{TEMP_IMAGE_DIR}pymupdf-{i}.{extension}")
+        pix.save(f"{TEMP_IMAGE_DIR}_{doc_id}_pymupdf-{i}.{extension}")
+        image_paths.append(f"{TEMP_IMAGE_DIR}_{doc_id}_pymupdf-{i}.{extension}")
     return image_paths
 
 
-def use_method_mutool(pdf_path, extension):
+def use_method_mutool(pdf_path, extension, doc_id):
     os.system(
-        f"mutool convert -o {TEMP_IMAGE_DIR}mutool-%d.{extension} {pdf_path} 1-100")
+        f"mutool convert -o {TEMP_IMAGE_DIR}_{doc_id}_mutool-%d.{extension} {pdf_path} 1-100")
     image_paths = []
     for i in range(1, 100):
-        image_paths.append(f'{TEMP_IMAGE_DIR}mutool-{i}.{extension}')
+        image_paths.append(f'{TEMP_IMAGE_DIR}_{doc_id}_mutool-{i}.{extension}')
     return image_paths
 
 
-def get_image_paths_local(method, pdf_path, extension):
+def get_image_paths_local(method, pdf_path, extension, doc_id):
     image_paths_local = []
     if method == 'pdf2image':
-        image_paths_local = use_method_pdf2image(pdf_path, extension)
+        image_paths_local = use_method_pdf2image(pdf_path, extension, doc_id)
     if method == 'pyvips':
-        image_paths_local = use_method_pyvips(pdf_path, extension)
+        image_paths_local = use_method_pyvips(pdf_path, extension, doc_id)
     if method == 'pypdfium':
-        image_paths_local = use_method_pypdfium(pdf_path, extension)
+        image_paths_local = use_method_pypdfium(pdf_path, extension, doc_id)
     if method == 'pymupdf':
-        image_paths_local = use_method_pymupdf(pdf_path, extension)
+        image_paths_local = use_method_pymupdf(pdf_path, extension, doc_id)
     if method == 'mutool':
-        image_paths_local = use_method_mutool(pdf_path, extension)
+        image_paths_local = use_method_mutool(pdf_path, extension, doc_id)
     return image_paths_local
 
 
@@ -315,7 +315,7 @@ def main_working(df, old_dir, new_dir):
                 continue
 
             for method in method_type:
-                image_paths_local = get_image_paths_local(method, pdf_path, extension)
+                image_paths_local = get_image_paths_local(method, pdf_path, extension, doc_id)
 
                 for filename, page_no in zip(df_new['filename'], df_new['page_no']):
                     shutil.move(f'{os.getcwd()}/{image_paths_local[page_no]}',
