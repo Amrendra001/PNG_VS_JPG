@@ -278,7 +278,7 @@ def use_method_pymupdf(pdf_path, extension):
 
 def use_method_mutool(pdf_path, extension):
     os.system(
-        f"convert -o {TEMP_IMAGE_DIR}mutool-%d.{extension} {pdf_path} 1-100")
+        f"mutool convert -o {TEMP_IMAGE_DIR}mutool-%d.{extension} {pdf_path} 1-100")
     image_paths = []
     for i in range(1, 100):
         image_paths.append(f'{TEMP_IMAGE_DIR}mutool-{i}.{extension}')
