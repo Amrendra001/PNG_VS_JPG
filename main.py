@@ -308,6 +308,10 @@ def main_working(df, old_dir, new_dir):
         extension = df_new['png_or_jpg'].unique()[0]
 
         try:
+
+            if os.path.isfile(f'{os.getcwd()}/{new_dir}/images/train/{df_new["filename"][0]}_{method_type[0]}.{extension}'):
+                continue
+
             pdf_path, is_found = get_pdf_path(doc_id)
             if not is_found:
                 print(f'PDF not found for = {doc_id}')
